@@ -1,0 +1,45 @@
+{% extends 'base.html' %}
+
+{% block title %}Мои привычки — Трекер привычек{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-8 col-lg-6">
+        <h1 class="mb-4 text-center">Мои привычки</h1>
+        
+        <div class="card shadow-sm p-4">
+            <!-- Форма добавления привычки на базе WTForms и HTMX -->
+            <form hx-post="/add" 
+                  hx-target="#habit-list" 
+                  hx-swap="beforeend" 
+                  hx-on::after-request="if(event.detail.successful) this.reset()" 
+                  class="mb-4">
+                
+                <!-- Генерация скрытого поля с CSRF-токеном -->
+                {{ form.hidden_tag() }}
+                
+                <div class="input-group">
+                    {{ form.name(class="form-control" + (" is-invalid" if form.name.errors else ""), placeholder="Название привычки...") }}
+                    <button class="btn btn-primary" type="submit">Добавить</button>
+                </div>
+                
+                <!-- Вывод ошибок валидации названия привычки -->
+                {% if form.name.errors %}
+                    <div class="text-danger small mt-1">
+                        {% for error in form.name.errors %}
+                            {{ error }}
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </form>
+            
+            <!-- Список привычек -->
+            <ul id="habit-list" class="list-group">
+                {% for habit in habits %}
+                    {% include 'habit_item.html' %}
+                {% endfor %}
+            </ul>
+        </div>
+    </div>
+</div>
+{% endblock %}

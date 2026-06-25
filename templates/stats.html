@@ -1,0 +1,220 @@
+{% extends 'base.html' %}
+
+{% block title %}Статистика — Трекер привычек{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-12 col-xl-10">
+        <h1 class="mb-4">Статистика привычек</h1>
+        
+        {% if habits %}
+        <!-- Блок с диаграммами Chart.js -->
+        <div class="row mb-4">
+            <!-- Левая карточка: Выбор привычки и столбчатый график -->
+            <div class="col-md-6 mb-3 mb-md-0">
+                <div class="card h-100 shadow-sm p-3">
+                    <h5 class="card-title text-center text-secondary mb-3">Динамика выполнений (7 дн.)</h5>
+                    <div class="input-group mb-3">
+                        <select id="habitSelect" class="form-select">
+                            {% for h in habits %}
+                            <option value="{{ h.id }}">{{ h.name }}</option>
+                            {% endfor %}
+                        </select>
+                        <button id="showChartBtn" class="btn btn-primary" type="button">Показать график</button>
+                    </div>
+                    <div class="position-relative" style="height: 220px;">
+                        <canvas id="habitChart"></canvas>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Правая карточка: Круговая диаграмма -->
+            <div class="col-md-6">
+                <div class="card h-100 shadow-sm p-3">
+                    <h5 class="card-title text-center text-secondary mb-3">Общий прогресс (30 дн.)</h5>
+                    <div class="position-relative" style="height: 275px;">
+                        <canvas id="overallPieChart"></canvas>
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endif %}
+        
+        <!-- Табличный отчет -->
+        <div class="card shadow-sm p-4">
+            {% if habits %}
+            <div class="table-responsive">
+                <table class="table table-striped table-hover align-middle">
+                    <thead class="table-dark">
+                        <tr>
+                            <th scope="col" style="width: 30%;">Название</th>
+                            <th scope="col" class="text-center" style="width: 15%;">За 7 дней</th>
+                            <th scope="col" class="text-center" style="width: 15%;">За 30 дней</th>
+                            <th scope="col" class="text-center" style="width: 15%;">Текущая серия</th>
+                            <th scope="col" class="text-center" style="width: 25%;">Успешность (30 дней)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for habit in habits %}
+                        <tr>
+                            <td class="fw-bold">{{ habit.name }}</td>
+                            <td class="text-center">
+                                <span class="badge bg-light text-dark border">
+                                    {{ habit.completions_in_last_days(7) }} / 7
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-light text-dark border">
+                                    {{ habit.completions_in_last_days(30) }} / 30
+                                </span>
+                            </td>
+                            <td class="text-center">
+                                <span class="badge bg-warning text-dark">
+                                    🔥 {{ habit.current_streak() }} дн.
+                                </span>
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center gap-2">
+                                    <div class="progress flex-grow-1" style="height: 10px;">
+                                        {% set percent = habit.completion_percentage_30_days() %}
+                                        <div class="progress-bar {% if percent >= 80 %}bg-success{% elif percent >= 50 %}bg-info{% else %}bg-secondary{% endif %}" 
+                                             role="progressbar" 
+                                             data-width="{{ percent }}" 
+                                             aria-valuenow="{{ percent }}" 
+                                             aria-valuemin="0" 
+                                             aria-valuemax="100">
+                                        </div>
+                                    </div>
+                                    <span class="small fw-semibold">{{ percent }}%</span>
+                                </div>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+            {% else %}
+            <!-- Пустое состояние -->
+            <div class="text-center py-4">
+                <p class="text-muted mb-3">Привычки еще не созданы.</p>
+                <a href="/" class="btn btn-primary btn-sm">Перейти на Главную и добавить</a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+{% if habits %}
+<!-- Контейнер для передачи JSON данных круговой диаграммы -->
+<div id="pieChartData" data-chart='{{ pie_data | tojson | safe }}'></div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // 1. Инициализация прогресс-баров в таблице
+        document.querySelectorAll('.progress-bar[data-width]').forEach(function(bar) {
+            const width = bar.getAttribute('data-width');
+            bar.style.width = width + '%';
+        });
+
+        // 2. Отрисовка круговой диаграммы (Doughnut) прогресса за 30 дней
+        const pieDataEl = document.getElementById('pieChartData');
+        if (pieDataEl) {
+            const chartData = JSON.parse(pieDataEl.dataset.chart);
+            const ctx = document.getElementById('overallPieChart').getContext('2d');
+            new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: chartData.labels,
+                    datasets: [{
+                        label: 'Успешность (%)',
+                        data: chartData.percentages,
+                        backgroundColor: [
+                            '#0d6efd', '#198754', '#0dcaf0', '#ffc107', '#dc3545',
+                            '#6610f2', '#6f42c1', '#d63384', '#fd7e14', '#20c997'
+                        ]
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                        legend: {
+                            position: 'bottom',
+                            labels: {
+                                boxWidth: 12,
+                                font: { size: 11 }
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 3. Логика для динамического столбчатого графика (Bar Chart)
+        let habitChartInstance = null;
+
+        function loadHabitChart() {
+            const selectEl = document.getElementById('habitSelect');
+            if (!selectEl) return;
+            const habitId = selectEl.value;
+            if (!habitId) return;
+
+            fetch('/stats/chart_data/' + habitId)
+                .then(response => response.json())
+                .then(data => {
+                    const ctx = document.getElementById('habitChart').getContext('2d');
+                    
+                    // Уничтожаем старую диаграмму во избежание наложения графики при наведении курсора
+                    if (habitChartInstance) {
+                        habitChartInstance.destroy();
+                    }
+
+                    habitChartInstance = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: data.dates,
+                            datasets: [{
+                                label: 'Выполнение',
+                                data: data.values,
+                                backgroundColor: '#0d6efd',
+                                borderRadius: 4
+                            }]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: { display: false }
+                            },
+                            scales: {
+                                y: {
+                                    min: 0,
+                                    max: 1,
+                                    ticks: {
+                                        stepSize: 1,
+                                        callback: function(value) {
+                                            if (value === 1) return 'Да';
+                                            if (value === 0) return 'Нет';
+                                            return '';
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    });
+                })
+                .catch(err => console.error("Ошибка при получении данных графика:", err));
+        }
+
+        // Слушатель клика по кнопке «Показать график»
+        const showChartBtn = document.getElementById('showChartBtn');
+        if (showChartBtn) {
+            showChartBtn.addEventListener('click', loadHabitChart);
+        }
+
+        // Строим график при первоначальной загрузке страницы для первой привычки в списке
+        loadHabitChart();
+    });
+</script>
+{% endif %}
+{% endblock %}
