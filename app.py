@@ -38,15 +38,17 @@ login_manager.init_app(app)
 def load_user(user_id):
     return db.session.get(User, int(user_id))
 
-# Включение поддержки Foreign Key каскадов в SQLite
-from sqlalchemy import event
-from sqlalchemy.engine import Engine
+# Включаем поддержку Foreign Key каскадов ТОЛЬКО для SQLite
+# Для PostgreSQL это не требуется, так как в ней внешние ключи включены по умолчанию
+if database_url.startswith("sqlite"):
+    from sqlalchemy import event
+    from sqlalchemy.engine import Engine
 
-@event.listens_for(Engine, "connect")
-def set_sqlite_pragma(dbapi_connection, connection_record):
-    cursor = dbapi_connection.cursor()
-    cursor.execute("PRAGMA foreign_keys=ON")
-    cursor.close()
+    @event.listens_for(Engine, "connect")
+    def set_sqlite_pragma(dbapi_connection, connection_record):
+        cursor = dbapi_connection.cursor()
+        cursor.execute("PRAGMA foreign_keys=ON")
+        cursor.close()
 
 # Создание таблиц при запуске приложения (работает и на SQLite, и на PostgreSQL)
 with app.app_context():
@@ -218,5 +220,4 @@ def logout():
     return redirect(url_for('login'))
 
 if __name__ == '__main__':
-    # Локальный запуск в режиме debug=False
     app.run(debug=False)
