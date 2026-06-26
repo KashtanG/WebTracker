@@ -101,54 +101,88 @@ def delete_habit(habit_id):
 @app.route('/toggle/<int:habit_id>', methods=['POST'])
 @login_required
 def toggle_habit(habit_id):
+    # Безопасная выборка: только привычки текущего пользователя
     habit = Habit.query.filter_by(id=habit_id, user_id=current_user.id).first_or_404()
-    today = date.today()
+    
+    # Считываем дату (поддерживаем и классическую HTML-форму, и JSON-тело от календаря)
+    date_str = None
+    if request.is_json:
+        json_data = request.get_json(silent=True)
+        if json_data:
+            date_str = json_data.get('date')
+    else:
+        date_str = request.form.get('date')
 
-    completion = Completion.query.filter_by(habit_id=habit_id, date=today).first()
+    if date_str:
+        try:
+            target_date = date.fromisoformat(date_str)
+        except ValueError:
+            return "Неверный формат даты", 400
+    else:
+        target_date = date.today()
+
+    # Запрещаем отмечать привычки будущим числом
+    if target_date > date.today():
+        return "Нельзя отмечать привычки будущим числом", 400
+
+    completion = Completion.query.filter_by(habit_id=habit_id, date=target_date).first()
 
     try:
         if completion:
+            # Если отметка за эту дату уже была — удаляем её
             db.session.delete(completion)
         else:
-            new_completion = Completion(habit_id=habit_id, date=today)
+            # Если отметки не было — создаем новую
+            new_completion = Completion(habit_id=habit_id, date=target_date)
             db.session.add(new_completion)
         db.session.commit()
     except Exception as e:
         db.session.rollback()
         return f"Ошибка при изменении статуса: {str(e)}", 500
 
+    # Если запрос пришел в формате JSON (из нашего календаря в статистике)
+    if request.is_json or request.headers.get('Accept') == 'application/json':
+        return jsonify({
+            'status': 'success',
+            'completed': not completion,
+            'date': date_str
+        })
+
+    # Обычный HTMX-запрос с главной страницы (возвращает фрагмент li)
     return render_template('habit_item.html', habit=habit)
 
 @app.route('/stats')
 @login_required
 def stats():
+    # Сортируем привычки по названию для таблицы
     habits = Habit.query.filter_by(user_id=current_user.id).order_by(Habit.name).all()
     
+    # Подготовка данных для круговой диаграммы (включая список ID)
     pie_data = {
         'labels': [h.name for h in habits],
-        'percentages': [h.completion_percentage_30_days() for h in habits]
+        'percentages': [h.completion_percentage_30_days() for h in habits],
+        'ids': [h.id for h in habits]  # Добавили ID для сопоставления цветов
     }
     
     return render_template('stats.html', habits=habits, pie_data=pie_data)
 
-@app.route('/stats/chart_data/<int:habit_id>')
+# Замените старый маршрут /stats/chart_data на следующий:
+@app.route('/stats/calendar_data/<int:habit_id>')
 @login_required
-def chart_data(habit_id):
+def calendar_data(habit_id):
+    # Безопасная выборка только для привычек текущего пользователя
     habit = Habit.query.filter_by(id=habit_id, user_id=current_user.id).first_or_404()
-    today = date.today()
     
-    dates = []
-    values = []
+    # Извлекаем все даты выполнения привычки в формате ISO (ГГГГ-ММ-ДД)
+    completed_dates = [c.date.isoformat() for c in habit.completions]
     
-    for i in range(6, -1, -1):
-        day = today - timedelta(days=i)
-        dates.append(day.strftime('%d.%m'))
-        completed = any(c.date == day for c in habit.completions)
-        values.append(1 if completed else 0)
-        
+    # Единая палитра цветов
+    colors = ['#0d6efd', '#198754', '#0dcaf0', '#ffc107', '#dc3545', '#6610f2', '#6f42c1', '#d63384', '#fd7e14', '#20c997']
+    color = colors[habit.id % len(colors)]
+    
     return jsonify({
-        'dates': dates,
-        'values': values
+        'completed_dates': completed_dates,
+        'color': color
     })
 
 # --- Маршруты авторизации ---
