@@ -1,29 +1,43 @@
 {% extends 'base.html' %}
 
-{% block title %}Мои привычки — Трекер привычек{% endblock %}
+{% block title %}Мои привычки — Routinery{% endblock %}
 
 {% block content %}
+<style>
+    .today-progress-bar {
+        background-color: var(--accent-violet) !important;
+        transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+</style>
+
 <div class="row justify-content-center">
-    <div class="col-md-8 col-lg-6">
-        <h1 class="mb-4 text-center">Мои привычки</h1>
-        
+    <div class="col-12">
+        <!-- Отображение сегодняшней даты -->
+        <div class="text-center mb-4">
+            <p class="text-muted mb-1 text-uppercase fw-bold" style="font-size: 0.8rem; letter-spacing: 1px;">Сегодня</p>
+            <h2 class="fw-bold text-capitalize" style="color: var(--accent-violet) !important;">{{ formatted_date }}</h2>
+        </div>
+    </div>
+</div>
+
+<div class="row">
+    <!-- Блок с привычками -->
+    <div class="col-md-7 col-lg-8 mb-4">
         <div class="card shadow-sm p-4">
-            <!-- Форма добавления привычки на базе WTForms и HTMX -->
+            <h5 class="card-title fw-bold text-secondary mb-3">Список привычек</h5>
+            
             <form hx-post="/add" 
                   hx-target="#habit-list" 
                   hx-swap="beforeend" 
-                  hx-on::after-request="if(event.detail.successful) this.reset()" 
+                  hx-on::after-request="if(event.detail.successful) { this.reset(); }" 
                   class="mb-4">
-                
-                <!-- Генерация скрытого поля с CSRF-токеном -->
                 {{ form.hidden_tag() }}
                 
                 <div class="input-group">
-                    {{ form.name(class="form-control" + (" is-invalid" if form.name.errors else ""), placeholder="Название привычки...") }}
+                    {{ form.name(class="form-control" + (" is-invalid" if form.name.errors else ""), placeholder="Название новой привычки...") }}
                     <button class="btn btn-primary" type="submit">Добавить</button>
                 </div>
                 
-                <!-- Вывод ошибок валидации названия привычки -->
                 {% if form.name.errors %}
                     <div class="text-danger small mt-1">
                         {% for error in form.name.errors %}
@@ -33,7 +47,6 @@
                 {% endif %}
             </form>
             
-            <!-- Список привычек -->
             <ul id="habit-list" class="list-group">
                 {% for habit in habits %}
                     {% include 'habit_item.html' %}
@@ -41,5 +54,111 @@
             </ul>
         </div>
     </div>
+    
+    <!-- Блок статистики (Справа) -->
+    <div class="col-md-5 col-lg-4 mb-4">
+        <div class="card shadow-sm p-4 h-100">
+            <h5 class="card-title fw-bold text-secondary mb-3">Сводка за день</h5>
+            
+            <div class="d-flex flex-column justify-content-between h-75">
+                <div class="mb-4">
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted">Всего привычек:</span>
+                        <span id="total-habits-count" class="fw-bold fs-5">{{ total_habits }}</span>
+                    </div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted">Выполнено сегодня:</span>
+                        <span id="completed-today-count" class="fw-bold fs-5 text-success">{{ completed_today }}</span>
+                    </div>
+                </div>
+                
+                <div>
+                    <div class="d-flex justify-content-between align-items-center mb-2">
+                        <span class="text-muted small">Прогресс за сегодня</span>
+                        <span id="completion-rate-text" class="fw-bold text-primary small">{{ completion_rate }}%</span>
+                    </div>
+                    
+                    <div class="progress mb-3" style="height: 12px; border-radius: 6px; background-color: rgba(255,255,255,0.08);">
+                        <div class="progress-bar today-progress-bar" 
+                             role="progressbar" 
+                             data-width="{{ completion_rate }}"
+                             aria-valuenow="{{ completion_rate }}" 
+                             aria-valuemin="0" 
+                             aria-valuemax="100">
+                        </div>
+                    </div>
+                    
+                    <div id="motivation-widget" class="p-3 rounded small motivation-container">
+                        {% if completion_rate == 100 %}
+                            🎉 <strong>Потрясающе!</strong> Вы выполнили абсолютно все задачи на сегодня!
+                        {% elif completion_rate >= 50 %}
+                            👍 <strong>Отличный темп!</strong> Больше половины пути пройдено. Продолжайте в том же духе!
+                        {% elif completion_rate > 0 %}
+                            🌱 <strong>Хорошее начало!</strong> Шаг за шагом вы приближаетесь к своим целям.
+                        {% else %}
+                            😴 Привычки еще не отмечены. Время сделать первый шаг за сегодня!
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 </div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        function updateDailyProgress() {
+            const habits = document.querySelectorAll('#habit-list li');
+            const total = habits.length;
+            let completed = 0;
+            
+            habits.forEach(function(li) {
+                if (li.querySelector('.btn-success')) {
+                    completed++;
+                }
+            });
+            
+            const rate = total > 0 ? Math.round((completed / total) * 100 * 10) / 10 : 0;
+            
+            const totalEl = document.getElementById('total-habits-count');
+            const completedEl = document.getElementById('completed-today-count');
+            const rateTextEl = document.getElementById('completion-rate-text');
+            const progressBar = document.querySelector('.today-progress-bar');
+            const motivationWidget = document.getElementById('motivation-widget');
+            
+            if (totalEl) totalEl.innerText = total;
+            if (completedEl) completedEl.innerText = completed;
+            if (rateTextEl) rateTextEl.innerText = rate + '%';
+            
+            if (progressBar) {
+                progressBar.style.width = rate + '%';
+                progressBar.setAttribute('aria-valuenow', rate);
+                progressBar.setAttribute('data-width', rate);
+            }
+            
+            if (motivationWidget) {
+                let msg = "";
+                if (rate === 100) {
+                    msg = "🎉 <strong>Потрясающе!</strong> Вы выполнили абсолютно все задачи на сегодня!";
+                } else if (rate >= 50) {
+                    msg = "👍 <strong>Отличный темп!</strong> Больше половины пути пройдено. Продолжайте в том же духе!";
+                } else if (rate > 0) {
+                    msg = "🌱 <strong>Хорошее начало!</strong> Шаг за шагом вы приближаетесь к своим целям.";
+                } else {
+                    msg = "😴 Привычки еще не отмечены. Время сделать первый шаг за сегодня!";
+                }
+                motivationWidget.innerHTML = msg;
+            }
+        }
+
+        const bar = document.querySelector('.today-progress-bar[data-width]');
+        if (bar) {
+            bar.style.width = bar.getAttribute('data-width') + '%';
+        }
+
+        document.body.addEventListener('htmx:afterOnLoad', function(evt) {
+            updateDailyProgress();
+        });
+    });
+</script>
 {% endblock %}

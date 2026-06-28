@@ -1,10 +1,27 @@
 {% extends 'base.html' %}
 
-{% block title %}Статистика — Трекер привычек{% endblock %}
+{% block title %}Статистика — Routinery{% endblock %}
 
 {% block content %}
+<!-- Дополнительный стиль для перекраски шапки таблицы в акцентный цвет -->
+<style>
+    /* Применяем цвет ко всем ячейкам заголовка, кроме строки с каплями */
+    .table-custom-header th:not(.table-drip-col) {
+        background-color: var(--accent-violet) !important;
+        color: #ffffff !important;
+        border: none !important;
+        padding: 12px 16px !important;
+    }
+    /* Сбрасываем стили для строки с каплями, чтобы она оставалась прозрачной */
+    .table-drip-col {
+        background-color: transparent !important;
+        border: none !important;
+        padding: 0 !important;
+    }
+</style>
+
 <!-- Определяем палитру цветов в шаблоне, чтобы сопоставить их с ID -->
-{% set colors = ['#0d6efd', '#198754', '#0dcaf0', '#ffc107', '#dc3545', '#6610f2', '#6f42c1', '#d63384', '#fd7e14', '#20c997'] %}
+{% set colors = ['#e76f51', '#ffb5a7', '#8ab17d', '#457b9d', '#f4a261', '#fcd5ce', '#2a9d8f', '#a8dadc', '#b5179e', '#9b5de5'] %}
 
 <div class="row justify-content-center">
     <div class="col-12 col-xl-10">
@@ -49,11 +66,12 @@
         {% endif %}
         
         <!-- Табличный отчет -->
-        <div class="card shadow-sm p-4">
+        <!-- РЕШЕНО: Добавлен mb-5 для создания комфортного отступа от низа страницы -->
+        <div class="card shadow-sm p-0 overflow-hidden mb-5">
             {% if habits %}
             <div class="table-responsive">
-                <table class="table table-striped table-hover align-middle">
-                    <thead class="table-dark">
+                <table class="table table-striped table-hover align-middle mb-0">
+                    <thead class="table-custom-header">
                         <tr>
                             <th scope="col" style="width: 30%;">Название</th>
                             <th scope="col" class="text-center" style="width: 15%;">За 7 дней</th>
@@ -61,11 +79,21 @@
                             <th scope="col" class="text-center" style="width: 15%;">Текущая серия</th>
                             <th scope="col" class="text-center" style="width: 25%;">Успешность (30 дней)</th>
                         </tr>
+                        <!-- РЕШЕНО: Векторные капли встроены прямо в thead в виде строки таблицы, они никогда не съедут -->
+                        <tr style="line-height: 0;">
+                            <th colspan="5" class="table-drip-col">
+                                <div style="overflow: hidden; line-height: 0; pointer-events: none; margin-top: -1px;">
+                                    <svg viewBox="0 0 1200 15" preserveAspectRatio="none" style="width: 100%; height: 15px; display: block;">
+                                        <path fill="var(--accent-violet)" d="M0,0 L1200,0 L1200,2 C1170,2 1165,9 1150,9 C1135,9 1130,2 1100,2 C1070,2 1065,13 1045,13 C1025,13 1020,2 990,2 C960,2 955,6 940,6 C925,6 920,2 890,2 C860,2 855,11 840,11 C825,11 820,2 790,2 C760,2 750,8 735,8 C720,8 710,2 680,2 C650,2 645,15 625,15 C605,15 600,2 570,2 C540,2 535,7 520,7 C505,7 500,2 470,2 C440,2 430,12 415,12 C400,12 390,2 360,2 C330,2 320,9 305,9 C290,9 280,2 250,2 C220,2 215,14 195,14 C175,14 170,2 140,2 C110,2 100,7 85,7 C70,7 60,2 30,2 C15,2 10,4 0,2 Z"></path>
+                                    </svg>
+                                </div>
+                            </th>
+                        </tr>
                     </thead>
                     <tbody>
                         {% for habit in habits %}
-                        {% set habit_color = colors[habit.id % colors|length] %}
-                        <tr>
+                        {% set habit_color = habit.get_color() %}
+                        <tr id="habit-row-{{ habit.id }}">
                             <td class="fw-bold d-flex align-items-center">
                                 <span class="d-inline-block rounded-circle me-2 habit-color-dot" 
                                       data-color="{{ habit_color }}">
@@ -73,23 +101,23 @@
                                 {{ habit.name }}
                             </td>
                             <td class="text-center">
-                                <span class="badge bg-light text-dark border">
+                                <span class="badge bg-light text-dark border habit-last-7">
                                     {{ habit.completions_in_last_days(7) }} / 7
                                 </span>
                             </td>
                             <td class="text-center">
-                                <span class="badge bg-light text-dark border">
+                                <span class="badge bg-light text-dark border habit-last-30">
                                     {{ habit.completions_in_last_days(30) }} / 30
                                 </span>
                             </td>
                             <td class="text-center">
-                                <span class="badge bg-warning text-dark">
+                                <span class="badge bg-warning text-dark habit-streak">
                                     🔥 {{ habit.current_streak() }} дн.
                                 </span>
                             </td>
                             <td>
                                 <div class="d-flex align-items-center gap-2">
-                                    <div class="progress flex-grow-1" style="height: 10px;">
+                                    <div class="progress flex-grow-1" style="height: 10px; background-color: rgba(255,255,255,0.08);">
                                         {% set percent = habit.completion_percentage_30_days() %}
                                         <div class="progress-bar" 
                                              role="progressbar" 
@@ -97,10 +125,11 @@
                                              data-color="{{ habit_color }}"
                                              aria-valuenow="{{ percent }}" 
                                              aria-valuemin="0" 
-                                             aria-valuemax="100">
+                                             aria-valuemax="100"
+                                             style="transition: width 0.4s ease;">
                                         </div>
                                     </div>
-                                    <span class="small fw-semibold">{{ percent }}%</span>
+                                    <span class="small fw-semibold habit-percent">{{ percent }}%</span>
                                 </div>
                             </td>
                         </tr>
@@ -109,7 +138,6 @@
                 </table>
             </div>
             {% else %}
-            <!-- Пустое состояние -->
             <div class="text-center py-4">
                 <p class="text-muted mb-3">Привычки еще не созданы.</p>
                 <a href="/" class="btn btn-primary btn-sm">Перейти на Главную и добавить</a>
@@ -120,13 +148,12 @@
 </div>
 
 {% if habits %}
-<!-- Контейнер для передачи JSON данных круговой диаграммы -->
 <div id="pieChartData" data-chart='{{ pie_data | tojson | safe }}'></div>
 
 <script>
     document.addEventListener("DOMContentLoaded", function() {
-        
-        // 1. Инициализация прогресс-баров в таблице (Безопасный блок)
+        let overallPieChartInstance = null;
+
         try {
             document.querySelectorAll('.progress-bar[data-width]').forEach(function(bar) {
                 const width = bar.getAttribute('data-width');
@@ -140,7 +167,6 @@
             console.error("Ошибка инициализации прогресс-баров:", e);
         }
 
-        // 2. Инициализация круглых маркеров цветов в таблице (Безопасный блок)
         try {
             document.querySelectorAll('.habit-color-dot[data-color]').forEach(function(dot) {
                 const color = dot.getAttribute('data-color');
@@ -154,24 +180,20 @@
             console.error("Ошибка инициализации маркеров цветов:", e);
         }
 
-        // 3. Отрисовка круговой диаграммы (Doughnut) прогресса за 30 дней (Безопасный блок)
         try {
             const pieDataEl = document.getElementById('pieChartData');
             if (pieDataEl && typeof Chart !== 'undefined') {
                 const chartData = JSON.parse(pieDataEl.dataset.chart);
-                const colorsPalette = ['#0d6efd', '#198754', '#0dcaf0', '#ffc107', '#dc3545', '#6610f2', '#6f42c1', '#d63384', '#fd7e14', '#20c997'];
-                
-                const sliceColors = chartData.ids.map(id => colorsPalette[id % colorsPalette.length]);
 
                 const ctx = document.getElementById('overallPieChart').getContext('2d');
-                new Chart(ctx, {
+                overallPieChartInstance = new Chart(ctx, {
                     type: 'doughnut',
                     data: {
                         labels: chartData.labels,
                         datasets: [{
                             label: 'Успешность (%)',
                             data: chartData.percentages,
-                            backgroundColor: sliceColors
+                            backgroundColor: chartData.colors
                         }]
                     },
                     options: {
@@ -193,16 +215,40 @@
             console.error("Ошибка построения круговой диаграммы:", e);
         }
 
-        // 4. Отрисовка календаря в DOM (Изолированная функция)
+        function updateTableRowStats(habitId, stats) {
+            try {
+                const row = document.getElementById('habit-row-' + habitId);
+                if (!row) return;
+
+                const last7 = row.querySelector('.habit-last-7');
+                const last30 = row.querySelector('.habit-last-30');
+                const streak = row.querySelector('.habit-streak');
+                const percentText = row.querySelector('.habit-percent');
+                const progressBar = row.querySelector('.habit-progress-bar');
+
+                if (last7) last7.innerText = stats.last_7 + ' / 7';
+                if (last30) last30.innerText = stats.last_30 + ' / 30';
+                if (streak) streak.innerText = '🔥 ' + stats.streak + ' дн.';
+                if (percentText) percentText.innerText = stats.percentage + '%';
+                if (progressBar) {
+                    progressBar.style.width = stats.percentage + '%';
+                    progressBar.setAttribute('aria-valuenow', stats.percentage);
+                    progressBar.setAttribute('data-width', stats.percentage);
+                }
+            } catch (err) {
+                console.error("Ошибка динамического обновления строки таблицы:", err);
+            }
+        }
+
         function renderCalendar(completedDates, habitColor, habitName, habitId) {
             try {
                 const container = document.getElementById('calendarContainer');
                 if (!container) return;
-                container.innerHTML = ''; // Очищаем контейнер
+                container.innerHTML = ''; 
 
                 const today = new Date();
                 const year = today.getFullYear();
-                const month = today.getMonth(); // 0-индексируемый (0 = Январь)
+                const month = today.getMonth(); 
 
                 const monthNames = [
                     "Январь", "Февраль", "Март", "Апрель", "Май", "Июнь",
@@ -244,9 +290,10 @@
                     grid.appendChild(emptyCell);
                 }
 
-                // Создаем дату «сегодня» без учета времени для корректного сравнения
-                const todayZero = new Date();
-                todayZero.setHours(0, 0, 0, 0);
+                const todayStr = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+                
+                // Считываем состояние темы для изменения неактивного цвета ячеек
+                const isDarkTheme = document.body.classList.contains('theme-dark');
 
                 for (let day = 1; day <= totalDays; day++) {
                     const cell = document.createElement('div');
@@ -255,10 +302,10 @@
                     cell.style.height = '32px';
                     cell.style.margin = 'auto';
                     cell.style.fontSize = '0.85rem';
+                    cell.style.transition = 'background-color 0.2s ease, color 0.2s ease';
                     cell.innerText = day;
 
                     const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                    const cellDate = new Date(year, month, day);
 
                     if (completedDates.includes(dateStr)) {
                         cell.style.backgroundColor = habitColor;
@@ -266,21 +313,25 @@
                         cell.style.fontWeight = 'bold';
                         cell.setAttribute('title', 'Выполнено (Нажмите, чтобы убрать)');
                     } else {
-                        cell.style.backgroundColor = '#f8f9fa';
-                        cell.style.color = '#212529';
+                        if (isDarkTheme) {
+                            cell.style.backgroundColor = 'rgba(255, 255, 255, 0.05)';
+                            cell.style.color = '#f8f9fa';
+                        } else {
+                            cell.style.backgroundColor = '#f8f9fa';
+                            cell.style.color = '#212529';
+                        }
                         cell.setAttribute('title', 'Не выполнено (Нажмите, чтобы отметить)');
                     }
 
-                    // Подсвечиваем рамкой сегодняшний день
-                    if (cellDate.getTime() === todayZero.getTime()) {
-                        cell.style.border = '2px solid #212529';
+                    if (dateStr === todayStr) {
+                        cell.style.border = '2px solid var(--accent-violet)';
                     }
 
-                    // Ограничение: Отмечать привычки можно только за прошлые дни и сегодня
-                    if (cellDate <= todayZero) {
+                    const isFuture = dateStr > todayStr;
+
+                    if (!isFuture) {
                         cell.style.cursor = 'pointer';
                         
-                        // Обработчик переключения отметки
                         cell.addEventListener('click', function() {
                             fetch('/toggle/' + habitId, {
                                 method: 'POST',
@@ -299,17 +350,15 @@
                             })
                             .then(data => {
                                 if (data.status === 'success') {
-                                    // Перезагружаем страницу, чтобы обновить все показатели в таблице и диаграмме
-                                    window.location.reload();
+                                    loadCalendar();
                                 }
                             })
                             .catch(err => {
                                 console.error("Ошибка при обновлении статуса:", err);
-                                alert("Произошла ошибка при изменении отметки привычки.");
+                                alert("Не удалось обновить статус привычки.");
                             });
                         });
                     } else {
-                        // Будущие даты делаем полупрозрачными и неактивными
                         cell.style.opacity = '0.4';
                         cell.setAttribute('title', 'Нельзя отмечать будущие дни');
                     }
@@ -323,7 +372,6 @@
             }
         }
 
-        // 5. Функция получения данных календаря (Безопасный блок)
         function loadCalendar() {
             try {
                 const selectEl = document.getElementById('habitSelect');
@@ -341,8 +389,19 @@
                         return response.json();
                     })
                     .then(data => {
-                        // Передаем ID привычки в функцию рендеринга для отправки запросов
                         renderCalendar(data.completed_dates, data.color, habitName, habitId);
+                        
+                        if (data.stats) {
+                            updateTableRowStats(habitId, data.stats);
+                        }
+
+                        if (overallPieChartInstance && data.stats) {
+                            const index = overallPieChartInstance.data.labels.indexOf(habitName);
+                            if (index !== -1) {
+                                overallPieChartInstance.data.datasets[0].data[index] = data.stats.percentage;
+                                overallPieChartInstance.update(); 
+                            }
+                        }
                     })
                     .catch(err => console.error("Ошибка при получении дат календаря через fetch:", err));
             } catch (e) {
@@ -350,17 +409,13 @@
             }
         }
 
-        // Привязываем обработчик на клик по кнопке
         const showChartBtn = document.getElementById('showChartBtn');
         if (showChartBtn) {
             showChartBtn.addEventListener('click', loadCalendar);
         }
 
-        // Автоматически обновляем календарь при изменении значения в выпадающем списке
         const habitSelect = document.getElementById('habitSelect');
         if (habitSelect) {
-            
-            // Восстановление выбранной привычки из localStorage (UX-оптимизация)
             const savedHabitId = localStorage.getItem('selectedHabitId');
             if (savedHabitId && [...habitSelect.options].some(opt => opt.value === savedHabitId)) {
                 habitSelect.value = savedHabitId;
@@ -372,7 +427,6 @@
             });
         }
 
-        // Инициализируем календарь
         loadCalendar();
     });
 </script>

@@ -3,22 +3,215 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <!-- Мета-тег с CSRF-токеном для HTMX -->
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>{% block title %}Трекер привычек{% endblock %}</title>
+    <title>{% block title %}Routinery{% endblock %}</title>
     <!-- Bootstrap 5 CSS CDN -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- HTMX CDN (версия 1.9.10) -->
+    <!-- HTMX CDN -->
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
     <!-- Chart.js CDN -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    
+    <!-- Подключение Google Fonts (Lora для заголовков, Nunito для текста) -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400..700;1,400..700&family=Nunito:ital,wght@0,300..900;1,300..900&display=swap" rel="stylesheet">
+    
+    <!-- Чистый статический CSS-блок без внедрения Jinja-тегов -->
+    <style>
+        :root {
+            /* Значения по умолчанию для статического анализатора (молочный беж #fbf3e4 и лаванда #a27bbc) */
+            --bg-beige: #fbf3e4;      
+            --accent-violet: #a27bbc; 
+            --pink-topaz: #b5179e;      
+            --text-dark: #2b2d42;       
+        }
+        body {
+            background-color: var(--bg-beige) !important;
+            font-family: 'Nunito', system-ui, -apple-system, sans-serif;
+            transition: background-color 0.3s ease, color 0.3s ease;
+        }
+
+        /* Применяем красивую засечку Lora к заголовкам и логотипу */
+        h1, h2, h3, h4, h5, h6, .navbar-brand {
+            font-family: 'Lora', Georgia, serif;
+        }
+
+        /* Настройки оформления для светлой темы */
+        body {
+            color: var(--text-dark);
+        }
+        .card {
+            background-color: #ffffff !important;
+        }
+        .motivation-container {
+            background-color: var(--bg-beige) !important;
+            color: #3d314a !important;
+        }
+        .habit-settings-card {
+            background-color: rgba(0, 0, 0, 0.02) !important;
+            border-color: rgba(0, 0, 0, 0.08) !important;
+        }
+
+        /* НАСТРОЙКИ ДЛЯ ТЕМНОЙ ТЕМЫ (активируются при темном фоне) */
+        .theme-dark body {
+            color: #f8f9fa !important;
+        }
+        
+        /* РЕШЕНО: Все текстовые элементы в темном режиме гарантированно становятся светло-серыми/белыми (исключая цветные семантические беджи) */
+        .theme-dark h1, .theme-dark h2, .theme-dark h3, .theme-dark h4, .theme-dark h5, .theme-dark h6,
+        .theme-dark span:not(.badge):not(.btn):not(.text-success):not(.text-danger):not(.text-warning):not(.text-info),
+        .theme-dark p, .theme-dark label, .theme-dark td, .theme-dark th, .theme-dark strong, .theme-dark .navbar-brand {
+            color: #f8f9fa !important;
+        }
+        
+        .theme-dark .text-muted, .theme-dark .text-secondary {
+            color: rgba(255, 255, 255, 0.5) !important;
+        }
+        /* Карточки на темном фоне получают красивый прозрачный оверлей */
+        .theme-dark .card {
+            background-color: rgba(255, 255, 255, 0.05) !important;
+            box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2) !important;
+        }
+        .theme-dark .list-group-item {
+            border-color: rgba(255, 255, 255, 0.1) !important;
+            color: #f8f9fa !important;
+        }
+        /* Стилизация полей ввода и селектов под темный фон */
+        .theme-dark .form-control, .theme-dark .form-select {
+            background-color: rgba(255, 255, 255, 0.08) !important;
+            border-color: rgba(255, 255, 255, 0.15) !important;
+            color: #f8f9fa !important;
+        }
+        .theme-dark .form-control:focus, .theme-dark .form-select:focus {
+            background-color: rgba(255, 255, 255, 0.12) !important;
+            color: #ffffff !important;
+            box-shadow: 0 0 0 0.25rem rgba(255, 255, 255, 0.1) !important;
+            border-color: rgba(255, 255, 255, 0.25) !important;
+        }
+        .theme-dark .form-control::placeholder {
+            color: rgba(255, 255, 255, 0.4) !important;
+        }
+        
+        /* РЕШЕНО: Эксплицитное темное оформление для option элементов dropdown-списков во избежание бага "белое на белом" */
+        .theme-dark option {
+            background-color: #212124 !important; 
+            color: #ffffff !important;
+        }
+        
+        /* РЕШЕНО: Полный сброс фонов таблиц и приведение их к адаптивному темному стилю */
+        .theme-dark .table {
+            background-color: transparent !important;
+            color: #f8f9fa !important;
+            --bs-table-color: #f8f9fa !important;
+            --bs-table-bg: transparent !important;
+            border-color: rgba(255, 255, 255, 0.12) !important;
+        }
+        .theme-dark .table td, .theme-dark .table th {
+            background-color: transparent !important;
+            color: #f8f9fa !important;
+        }
+        .theme-dark .table-striped > tbody > tr:nth-of-type(odd) > * {
+            background-color: rgba(255, 255, 255, 0.02) !important;
+            color: #f8f9fa !important;
+        }
+        .theme-dark .table-hover > tbody > tr:hover > * {
+            background-color: rgba(255, 255, 255, 0.04) !important;
+        }
+        
+        /* Стилизация системных беджей в таблице */
+        .theme-dark .badge.bg-light {
+            background-color: rgba(255, 255, 255, 0.08) !important;
+            color: #f8f9fa !important;
+            border-color: rgba(255, 255, 255, 0.15) !important;
+        }
+        .theme-dark .navbar-text {
+            color: #ffffff !important;
+        }
+        .theme-dark .motivation-container {
+            background-color: rgba(255, 255, 255, 0.03) !important;
+            color: #f8f9fa !important;
+        }
+        .theme-dark .habit-settings-card {
+            background-color: rgba(255, 255, 255, 0.02) !important;
+            border-color: rgba(255, 255, 255, 0.08) !important;
+        }
+
+        /* Навигационная панель */
+        .navbar-dark.bg-dark {
+            position: relative;
+            background-color: var(--accent-violet) !important; 
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.05);
+            border-bottom: none !important;
+            /* Даем нижний отступ, чтобы вместить стекающие капли */
+            margin-bottom: 3.5rem !important; 
+        }
+        .card {
+            border: none !important;
+            border-radius: 14px !important;
+            box-shadow: 0 4px 12px rgba(61, 49, 74, 0.05) !important;
+        }
+        .btn-primary {
+            background-color: var(--accent-violet) !important;
+            border-color: var(--accent-violet) !important;
+            border-radius: 8px;
+        }
+        .btn-primary:hover {
+            opacity: 0.9 !important;
+        }
+        .btn-outline-primary {
+            color: var(--accent-violet) !important;
+            border-color: var(--accent-violet) !important;
+        }
+        .btn-outline-primary:hover {
+            background-color: var(--accent-violet) !important;
+            color: #fff !important;
+        }
+        .list-group-item {
+            border-left: none;
+            border-right: none;
+            border-color: #e5dbca !important;
+            background-color: transparent !important;
+        }
+        .badge {
+            font-weight: 600;
+        }
+    </style>
+
+    <!-- Динамическая JS-инъекция переменных оформления (молочный беж и лаванда как fallback) -->
+    <script>
+        const themeBg = "{% if current_user.is_authenticated %}{{ current_user.theme_bg_color }}{% else %}#fbf3e4{% endif %}";
+        const themeAccent = "{% if current_user.is_authenticated %}{{ current_user.theme_accent_color }}{% else %}#a27bbc{% endif %}";
+        
+        document.documentElement.style.setProperty('--bg-beige', themeBg);
+        document.documentElement.style.setProperty('--accent-violet', themeAccent);
+
+        // РЕШЕНО: Анализ яркости перенесен на сторону клиента. 
+        // Если фон темный, класс theme-dark автоматически вешается на HTML до начала отрисовки.
+        const hex = themeBg.replace('#', '');
+        if (hex.length === 6) {
+            const r = parseInt(hex.substring(0, 2), 16);
+            const g = parseInt(hex.substring(2, 4), 16);
+            const b = parseInt(hex.substring(4, 6), 16);
+            const brightness = (r * 299 + g * 587 + b * 114) / 1000;
+            if (brightness < 125) {
+                document.documentElement.classList.add('theme-dark');
+                // Добавляем класс на body после его инициализации для обратной совместимости
+                document.addEventListener("DOMContentLoaded", function() {
+                    document.body.classList.add('theme-dark');
+                });
+            } else {
+                document.documentElement.classList.remove('theme-dark');
+            }
+        }
+    </script>
 </head>
-<body class="bg-light">
+<body>
 
     <!-- Навигационное меню -->
-    <nav class="navbar navbar-expand-lg navbar-dark bg-dark mb-4">
+    <nav class="navbar navbar-expand-lg navbar-dark bg-dark">
         <div class="container">
-            <a class="navbar-brand" href="/">Трекер привычек</a>
+            <a class="navbar-brand text-uppercase fw-bold tracking-wider" href="/" style="font-size: 1.45rem;">Routinery</a>
             <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Переключатель навигации">
                 <span class="navbar-toggler-icon"></span>
             </button>
@@ -30,6 +223,11 @@
                     <li class="nav-item">
                         <a class="nav-link" href="/stats">Статистика</a>
                     </li>
+                    {% if current_user.is_authenticated %}
+                    <li class="nav-item">
+                        <a class="nav-link" href="/settings">Настройки</a>
+                    </li>
+                    {% endif %}
                 </ul>
                 <ul class="navbar-nav ms-auto align-items-center">
                     {% if current_user.is_authenticated %}
@@ -52,11 +250,17 @@
                 </ul>
             </div>
         </div>
+
+        <!-- Векторные "стекающие" органические капли, привязанные к цвету --accent-violet -->
+        <div style="position: absolute; bottom: -28px; left: 0; width: 100%; height: 30px; overflow: hidden; line-height: 0; pointer-events: none; z-index: 10;">
+            <svg viewBox="0 0 1200 30" preserveAspectRatio="none" style="width: 100%; height: 30px;">
+                <path fill="var(--accent-violet)" d="M0,0 L1200,0 L1200,4 C1170,4 1165,18 1150,18 C1135,18 1130,4 1100,4 C1070,4 1065,26 1045,26 C1025,26 1020,4 990,4 C960,4 955,12 940,12 C925,12 920,4 890,4 C860,4 855,22 840,22 C825,22 820,4 790,4 C760,4 750,16 735,16 C720,16 710,4 680,4 C650,4 645,30 625,30 C605,30 600,4 570,4 C540,4 535,14 520,14 C505,14 500,4 470,4 C440,4 430,24 415,24 C400,24 390,4 360,4 C330,4 320,18 305,18 C290,18 280,4 250,4 C220,4 215,28 195,28 C175,28 170,4 140,4 C110,4 100,14 85,14 C70,14 60,4 30,4 C15,4 10,8 0,4 Z"></path>
+            </svg>
+        </div>
     </nav>
 
     <!-- Основной контент -->
     <main class="container">
-        <!-- Блок вывода всплывающих уведомлений Flask -->
         {% with messages = get_flashed_messages(with_categories=true) %}
             {% if messages %}
                 <div class="row justify-content-center">

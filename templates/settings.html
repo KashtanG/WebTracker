@@ -1,0 +1,183 @@
+{% extends 'base.html' %}
+
+{% block title %}Настройки — Routinery{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center">
+    <div class="col-md-10 col-lg-8">
+        <h1 class="mb-4">Настройки оформления</h1>
+        
+        <!-- Карточка 1: Глобальная тема оформления сайта -->
+        <div class="card shadow-sm p-4 mb-4">
+            <h5 class="fw-bold text-secondary mb-3">Цвета оформления Routinery</h5>
+            <form method="POST" action="{{ url_for('settings') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                
+                <div class="row mb-4">
+                    <div class="col-6">
+                        <label for="theme_bg_color" class="form-label text-muted small fw-semibold">Цвет фона сайта</label>
+                        <input type="color" name="theme_bg_color" id="theme_bg_color" 
+                               class="form-control form-control-color w-100" 
+                               value="{{ current_user.theme_bg_color }}" 
+                               style="height: 45px; border-radius: 8px;">
+                    </div>
+                    <div class="col-6">
+                        <label for="theme_accent_color" class="form-label text-muted small fw-semibold">Акцентный цвет</label>
+                        <input type="color" name="theme_accent_color" id="theme_accent_color" 
+                               class="form-control form-control-color w-100" 
+                               value="{{ current_user.theme_accent_color }}" 
+                               style="height: 45px; border-radius: 8px;">
+                    </div>
+                </div>
+                
+                <div class="d-flex justify-content-between align-items-center">
+                    <span class="text-muted small">Настройте палитру выше и сохраните оформление</span>
+                    <button type="submit" class="btn btn-primary px-4">Применить цвета</button>
+                </div>
+            </form>
+            
+            <!-- Готовые пресеты (Быстрый выбор) -->
+            <div class="mt-4 border-top pt-3">
+                <label class="small text-muted fw-semibold d-block mb-3">Готовые пресеты оформления:</label>
+                <div class="d-flex flex-wrap gap-2">
+                    <form action="{{ url_for('apply_preset') }}" method="POST" class="d-inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" name="preset" value="default" class="btn btn-sm btn-outline-secondary">
+                            🍦 Классический бежевый
+                        </button>
+                    </form>
+                    <form action="{{ url_for('apply_preset') }}" method="POST" class="d-inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" name="preset" value="light" class="btn btn-sm btn-outline-secondary">
+                            ☀️ Светлая тема
+                        </button>
+                    </form>
+                    <form action="{{ url_for('apply_preset') }}" method="POST" class="d-inline">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                        <button type="submit" name="preset" value="dark" class="btn btn-sm btn-outline-secondary">
+                            🌙 Темная тема
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+
+        <!-- Карточка 2: Создание персональных пользовательских тем -->
+        <div class="card shadow-sm p-4 mb-4">
+            <h5 class="fw-bold text-secondary mb-3">Сохранить текущие цвета как тему</h5>
+            <form method="POST" action="{{ url_for('save_theme') }}">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <div class="input-group">
+                    <input type="text" name="theme_name" class="form-control" placeholder="Например: Осенний закат..." required>
+                    <button type="submit" class="btn btn-primary">Сохранить тему</button>
+                </div>
+            </form>
+
+            {% if user_themes %}
+                <div class="mt-4 border-top pt-3">
+                    <label class="small text-muted fw-semibold d-block mb-2">Ваши персональные темы:</label>
+                    <div class="d-flex flex-column gap-2">
+                        {% for theme in user_themes %}
+                        <!-- Применен класс .habit-settings-card для адаптивного изменения фона -->
+                        <div class="d-flex justify-content-between align-items-center p-2 rounded border habit-settings-card">
+                            <div class="d-flex align-items-center">
+                                <span class="d-inline-block rounded-circle me-1 theme-preview-dot border" data-color="{{ theme.bg_color }}"></span>
+                                <span class="d-inline-block rounded-circle me-3 theme-preview-dot border" data-color="{{ theme.accent_color }}"></span>
+                                <span class="fw-bold small">{{ theme.name }}</span>
+                            </div>
+                            <div class="d-flex gap-2">
+                                <form action="{{ url_for('apply_theme', theme_id=theme.id) }}" method="POST" style="display:inline;">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-sm btn-success py-1 px-3">Применить</button>
+                                </form>
+                                <form action="{{ url_for('delete_theme', theme_id=theme.id) }}" method="POST" style="display:inline;">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" class="btn btn-sm btn-outline-danger py-1">Удалить</button>
+                                </form>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+        </div>
+        
+        <!-- Карточка 3: Настройка индивидуальных цветов привычек -->
+        <div class="card shadow-sm p-4 mb-4">
+            <h5 class="fw-bold text-secondary mb-3">Индивидуальные цвета привычек</h5>
+            
+            {% if habits %}
+                <div class="d-flex flex-column gap-3">
+                    {% for h in habits %}
+                    <!-- Применен класс .habit-settings-card для адаптивного изменения фона -->
+                    <div class="card p-3 border habit-settings-card" style="box-shadow: none !important;">
+                        <div class="d-flex flex-column flex-sm-row justify-content-between align-items-sm-center gap-2">
+                            <div>
+                                <h6 class="mb-0 fw-bold d-flex align-items-center">
+                                    <span class="d-inline-block rounded-circle me-2 habit-color-dot" 
+                                          data-color="{{ h.get_color() }}">
+                                    </span>
+                                    {{ h.name }}
+                                </h6>
+                            </div>
+                        </div>
+                        
+                        <div class="mt-3 border-top pt-2">
+                            <label class="small text-muted fw-semibold d-block mb-2">Выберите гармоничный цвет из палитры:</label>
+                            <div class="d-flex flex-wrap gap-2">
+                                {% for c in ['#e76f51', '#ffb5a7', '#8ab17d', '#457b9d', '#f4a261', '#fcd5ce', '#2a9d8f', '#a8dadc', '#b5179e', '#9b5de5'] %}
+                                <form action="{{ url_for('set_habit_color', habit_id=h.id) }}" method="POST" style="display: inline;">
+                                    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                                    <button type="submit" name="custom_color" value="{{ c }}" 
+                                            class="rounded-circle border-0 d-inline-block position-relative color-picker-btn" 
+                                            data-color="{{ c }}"
+                                            title="Выбрать данный цвет">
+                                        {% if h.custom_color == c %}
+                                        <span class="position-absolute top-50 start-50 translate-middle text-white fw-bold" style="font-size: 0.8rem;">✓</span>
+                                        {% endif %}
+                                    </button>
+                                </form>
+                                {% endfor %}
+                            </div>
+                        </div>
+                    </div>
+                    {% endfor %}
+                </div>
+            {% else %}
+                <p class="text-muted text-center py-3 mb-0">Привычки для кастомизации не найдены.</p>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        document.querySelectorAll('.habit-color-dot[data-color]').forEach(function(dot) {
+            const color = dot.getAttribute('data-color');
+            dot.style.width = '14px';
+            dot.style.height = '14px';
+            if (color) {
+                dot.style.backgroundColor = color;
+            }
+        });
+
+        document.querySelectorAll('.theme-preview-dot[data-color]').forEach(function(dot) {
+            const color = dot.getAttribute('data-color');
+            dot.style.width = '16px';
+            dot.style.height = '16px';
+            if (color) {
+                dot.style.backgroundColor = color;
+            }
+        });
+
+        document.querySelectorAll('.color-picker-btn[data-color]').forEach(function(btn) {
+            const color = btn.getAttribute('data-color');
+            btn.style.width = '32px';
+            btn.style.height = '32px';
+            if (color) {
+                btn.style.backgroundColor = color;
+            }
+        });
+    });
+</script>
+{% endblock %}
